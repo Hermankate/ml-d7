@@ -1,5 +1,3 @@
-import sys
-sys.modules["torch.classes"] = None
 import streamlit as st
 from PyPDF2 import PdfReader
 import pandas as pd
@@ -10,9 +8,23 @@ from sklearn.metrics.pairwise import cosine_similarity
 from io import BytesIO
 from pdf2image import convert_from_bytes
 import PIL
+import spacy.cli
+import subprocess
 
-# Load spaCy English model
-nlp = spacy.load("en_core_web_sm")
+# Download and load spaCy English model
+def load_spacy_model():
+    model_name = "en_core_web_sm"
+    try:
+        # Try loading the model
+        nlp = spacy.load(model_name)
+    except OSError:
+        # If model is not found, download it
+        st.info(f"Downloading spaCy model: {model_name}")
+        subprocess.run(["python", "-m", "spacy", "download", model_name], check=True)
+        nlp = spacy.load(model_name)
+    return nlp
+
+nlp = load_spacy_model()
 
 def show_pdf(file_bytes):
     try:

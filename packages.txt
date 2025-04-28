@@ -1,1 +1,3 @@
 poppler-utils
+libgcc
+build-essential
