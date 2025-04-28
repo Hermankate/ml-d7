@@ -183,37 +183,10 @@ import spacy
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 from io import BytesIO
+from streamlit_pdf_viewer import pdf_viewer  # New package
 
 # Load spaCy English model
 nlp = spacy.load("en_core_web_sm")
-
-def show_pdf(file_bytes):
-    try:
-        # Method 1: Browser-native PDF embedding
-        base64_pdf = base64.b64encode(file_bytes).decode('utf-8')
-        pdf_display = f"""
-        <embed src="data:application/pdf;base64,{base64_pdf}" 
-               width="100%" 
-               height="800px" 
-               type="application/pdf">
-        """
-        st.markdown(pdf_display, unsafe_allow_html=True)
-        
-        # Method 2: Text preview fallback
-        with st.expander("📄 View Text Version", expanded=True):
-            text = extract_text_from_pdf(file_bytes)
-            st.write(text[:2000] + "...")  # Show first 2000 characters
-            
-        # Method 3: Download button
-        st.download_button(
-            label="📥 Download Full Resume",
-            data=file_bytes,
-            file_name="resume.pdf",
-            mime="application/pdf"
-        )
-        
-    except Exception as e:
-        st.error(f"Preview unavailable: {str(e)}")
 
 @st.cache_data
 def extract_text_from_pdf(file_bytes):
@@ -306,7 +279,6 @@ with st.sidebar:
     """)
     st.markdown('</div>', unsafe_allow_html=True)
 
-    # Footer
     st.markdown("<br>", unsafe_allow_html=True)
     st.caption("Made with ❤️ by ML-D7")
 
@@ -318,7 +290,6 @@ st.header("📌 Job Description")
 job_description = st.text_area("Enter the job description here...")
 
 if uploaded_files and job_description:
-    resume_texts_dict = {}
     resume_files_dict = {}
     resume_texts_list = []
     candidate_info = []
@@ -327,7 +298,6 @@ if uploaded_files and job_description:
         file_bytes = file.getvalue()
         resume_files_dict[file.name] = file_bytes
         text = extract_text_from_pdf(file_bytes)
-        resume_texts_dict[file.name] = text
         resume_texts_list.append(text)
         
         name, email, phone = extract_candidate_details(text)
@@ -347,17 +317,34 @@ if uploaded_files and job_description:
     results_df = results_df.sort_values(by="Score", ascending=False).reset_index(drop=True)
     st.dataframe(results_df, use_container_width=True)
 
-    # Add preview section to sidebar after processing
+    # Preview section
     with st.sidebar:
         st.markdown('<div class="sidebar-section"><div class="sidebar-header">🔍 Resume Preview</div>', unsafe_allow_html=True)
-        sorted_file_names = results_df["File Name"].tolist()
-        selected_file = st.selectbox("Select resume to view:", sorted_file_names, key="preview_selector")
+        selected_file = st.selectbox("Select resume:", results_df["File Name"].tolist())
         st.markdown('</div>', unsafe_allow_html=True)
 
-    # Show selected PDF preview
+    # PDF Viewer
     st.subheader(f"📑 Preview of {selected_file}")
     pdf_bytes = resume_files_dict.get(selected_file)
+    
     if pdf_bytes:
-        show_pdf(pdf_bytes)
+        try:
+            # Using streamlit-pdf-viewer component
+            pdf_viewer(input=pdf_bytes, width=700)
+            
+            # Fallback text preview
+            with st.expander("View Text Content"):
+                text = extract_text_from_pdf(pdf_bytes)
+                st.write(text[:2000] + "...")
+                
+            # Download button
+            st.download_button(
+                label="Download Full PDF",
+                data=pdf_bytes,
+                file_name=selected_file,
+                mime="application/pdf"
+            )
+        except Exception as e:
+            st.error(f"Error displaying PDF: {str(e)}")
     else:
-        st.warning("No PDF content available")
+        st.warning("No PDF content found")
